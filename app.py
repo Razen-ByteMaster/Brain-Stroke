@@ -1,16 +1,15 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from pathlib import Path
 import joblib
 import pandas as pd
 
 app = FastAPI()
 
-# Load model data
+# Load model data (next to this file — portable, no absolute paths)
 try:
-    model_data = joblib.load("stroke_model_best.pkl")
+    model_data = joblib.load(Path(__file__).parent / "stroke_model_best.pkl")
     model = model_data["model"]
-    categorical_features = model_data["categorical_features"]
-    numerical_features = model_data["numerical_features"]
     print("Model loaded successfully!")
 except Exception as e:
     print(f"Error loading model: {str(e)}")
@@ -30,14 +29,13 @@ class StrokeInput(BaseModel):
     bmi: float
     smoking_status: str
 
-    class Config:
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 def prepare_input(input_data: StrokeInput):
     """Prepare input DataFrame with correct column names"""
-    # Use dict(by_alias=False) → gives field names as defined in the model
-    df = pd.DataFrame([input_data.dict(by_alias=False)])
+    # by_alias=False → field names as defined in the model (e.g. Residence_type)
+    df = pd.DataFrame([input_data.model_dump(by_alias=False)])
     return df
 
 

@@ -21,7 +21,7 @@ from sklearn.metrics import (
     classification_report,
     confusion_matrix,
 )
-from scipy.stats import randint, uniform
+from scipy.stats import randint
 
 # imblearn
 from imblearn.over_sampling import SMOTE
@@ -29,8 +29,9 @@ from imblearn.pipeline import Pipeline as ImbPipeline
 
 RANDOM_STATE = 42
 
-# Load dataset
-df = pd.read_csv(r"C:\VScode-Project\GRAD PROJECT\New\Brain_Stroke\brain_stroke.csv")
+# Load dataset (next to this script — portable, no absolute paths)
+from pathlib import Path
+df = pd.read_csv(Path(__file__).parent / "brain_stroke.csv")
 
 # Basic clean (optional) — ensure there are no stray index columns
 if "Unnamed: 0" in df.columns:
@@ -56,9 +57,16 @@ numerical_features = [
 ]
 
 # Preprocessing pipelines
+def make_onehot_encoder():
+    try:
+        return OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+    except TypeError:  # sklearn < 1.2
+        return OneHotEncoder(handle_unknown="ignore", sparse=False)
+
+
 categorical_transformer = make_pipeline(
     SimpleImputer(strategy="most_frequent"),
-    OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+    make_onehot_encoder(),
 )
 
 numerical_transformer = make_pipeline(
@@ -149,21 +157,10 @@ print(classification_report(y_test, y_pred, zero_division=0))
 print("Confusion matrix:")
 print(confusion_matrix(y_test, y_pred))
 
-# Save model and metadata
-onehot_columns = (
-    rs.best_estimator_.named_steps["preprocessor"]
-    .transformers_[1][1]
-    .named_steps["onehotencoder"]
-    .get_feature_names_out(categorical_features)
-)
-
-
+# Save model and metadata (model + preprocessor live in one pipeline — no train/serve skew)
 model_data = {
     "model": best_model,
-    "categorical_features": categorical_features,
-    "numerical_features": numerical_features,
-    "onehot_columns": onehot_columns,
 }
 
-joblib.dump(model_data, "stroke_model_best.pkl")
+joblib.dump(model_data, Path(__file__).parent / "stroke_model_best.pkl")
 print("Saved best model to stroke_model_best.pkl")
